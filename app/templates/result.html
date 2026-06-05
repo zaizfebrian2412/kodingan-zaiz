@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hasil Klasifikasi</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="card card-wide">
+        <div class="header">
+            <h1>Hasil Klasifikasi</h1>
+        </div>
+
+        <div class="result-grid">
+            <div class="result-image">
+                <img src="{{ image_url }}" alt="Gambar yang diunggah">
+            </div>
+
+            <div class="result-info">
+                <p class="result-label-caption">Jenis sampah terdeteksi:</p>
+                <p class="result-label">{{ label }}</p>
+
+                <div class="confidence-wrap">
+                    <div class="confidence-row">
+                        <span>Tingkat keyakinan</span>
+                        <span class="confidence-value">{{ "%.2f"|format(confidence) }}%</span>
+                    </div>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" style="width: {{ confidence }}%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h2 class="table-title">Probabilitas Semua Kelas</h2>
+        <table class="prob-table">
+            <thead>
+                <tr>
+                    <th>Kelas</th>
+                    <th>Probabilitas</th>
+                    <th>Visual</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in probabilities %}
+                <tr {% if loop.first %}class="top-row"{% endif %}>
+                    <td>{{ item.name }}</td>
+                    <td>{{ "%.2f"|format(item.percent) }}%</td>
+                    <td>
+                        <div class="mini-bar">
+                            <div class="mini-fill" style="width: {{ item.percent }}%;"></div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <a href="{{ url_for('index') }}" class="btn btn-back">&larr; Klasifikasi Gambar Lain</a>
+
+        <div class="identity">
+            <p class="identity-name">ZAIZ FEBRIAN (10122052)</p>
+            <p>Program Studi Teknik Informatika</p>
+            <p>Fakultas Teknik dan Ilmu Komputer</p>
+            <p>Universitas Komputer Indonesia</p>
+        </div>
+    </div>
+</body>
+</html>

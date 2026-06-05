@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klasifikasi Citra Sampah</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="card">
+        <div class="header">
+            <div class="logo">&#9851;</div>
+            <h1>Klasifikasi Citra Sampah</h1>
+            <p class="subtitle">Sistem CNN: Studi Kasus UPT TPSA Cihara</p>
+        </div>
+
+        {% if not model_ready %}
+            <div class="alert alert-warning">
+                {{ model_message }}
+            </div>
+        {% endif %}
+
+        {% if error %}
+            <div class="alert alert-error">
+                {{ error }}
+            </div>
+        {% endif %}
+
+        <form action="{{ url_for('predict') }}" method="post" enctype="multipart/form-data"
+              {% if not model_ready %}class="disabled"{% endif %}>
+
+            <label for="image" class="upload-box" id="uploadBox">
+                <span class="upload-icon">&#128247;</span>
+                <span class="upload-text">Klik untuk memilih foto sampah</span>
+                <span class="upload-hint">Format: JPG, JPEG, PNG (maks. 10 MB)</span>
+            </label>
+            <input type="file" name="image" id="image" accept=".jpg,.jpeg,.png"
+                   {% if not model_ready %}disabled{% endif %} required>
+
+            <div class="or-divider" id="orDivider"><span>atau</span></div>
+
+            <button type="button" class="btn btn-secondary" id="openCam"
+                    {% if not model_ready %}disabled{% endif %}>
+                &#128247; Gunakan Kamera
+            </button>
+
+            <div class="cam-panel" id="camPanel" hidden>
+                <video id="cam" autoplay playsinline></video>
+                <div class="cam-actions">
+                    <button type="button" class="btn" id="snap">Ambil Foto</button>
+                    <button type="button" class="btn btn-secondary" id="closeCam">Batal</button>
+                </div>
+            </div>
+            <canvas id="canvas" hidden></canvas>
+
+            <div class="preview-box" id="previewBox" hidden>
+                <img id="preview" class="preview-img" alt="Pratinjau gambar">
+                <span class="file-name" id="fileName"></span>
+                <button type="button" class="btn btn-secondary" id="changePhoto">Ganti Foto</button>
+            </div>
+
+            <button type="submit" class="btn" {% if not model_ready %}disabled{% endif %}>
+                Klasifikasikan
+            </button>
+        </form>
+
+        <div class="identity">
+            <p class="identity-name">ZAIZ FEBRIAN (10122052)</p>
+            <p>Program Studi Teknik Informatika</p>
+            <p>Fakultas Teknik dan Ilmu Komputer</p>
+            <p>Universitas Komputer Indonesia</p>
+        </div>
+
+        <p class="footer">Prototype skripsi &bull; CNN + Data Augmentation</p>
+    </div>
+
+    <script>
+        const input = document.getElementById('image');
+        const fileName = document.getElementById('fileName');
+        const uploadBox = document.getElementById('uploadBox');
+        const orDivider = document.getElementById('orDivider');
+        const openCam = document.getElementById('openCam');
+        const camPanel = document.getElementById('camPanel');
+        const previewBox = document.getElementById('previewBox');
+        const preview = document.getElementById('preview');
+        const changePhoto = document.getElementById('changePhoto');
+        const closeCam = document.getElementById('closeCam');
+        const snap = document.getElementById('snap');
+        const video = document.getElementById('cam');
+        const canvas = document.getElementById('canvas');
+        let stream = null;
+
+        // --- Tiga mode yang SALING EKSKLUSIF (tidak pernah tampil bersamaan) ---
+        function modeChooser() {                 // pilih sumber: upload / kamera
+            uploadBox.hidden = false; orDivider.hidden = false; openCam.hidden = false;
+            camPanel.hidden = true; previewBox.hidden = true;
+        }
+        function modeCamera() {                   // kamera aktif
+            uploadBox.hidden = true; orDivider.hidden = true; openCam.hidden = true;
+            previewBox.hidden = true; camPanel.hidden = false;
+        }
+        function modePreview(url, caption) {      // ada gambar siap diklasifikasikan
+            preview.src = url; fileName.textContent = caption || '';
+            uploadBox.hidden = true; orDivider.hidden = true; openCam.hidden = true;
+            camPanel.hidden = true; previewBox.hidden = false;
+        }
+
+        function stopStream() {
+            if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+        }
+
+        // Pilih file -> tampilkan pratinjau
+        if (input) {
+            input.addEventListener('change', function () {
+                if (input.files.length > 0) {
+                    const file = input.files[0];
+                    modePreview(URL.createObjectURL(file), file.name);
+                }
+            });
+        }
+
+        // "Ganti Foto" -> kosongkan pilihan, kembali ke mode pilih sumber
+        if (changePhoto) {
+            changePhoto.addEventListener('click', function () {
+                input.value = '';
+                preview.removeAttribute('src');
+                modeChooser();
+            });
+        }
+
+        // ---------- Akses kamera (capture manual) ----------
+        if (openCam) {
+            openCam.addEventListener('click', async function () {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    alert('Browser ini tidak mendukung akses kamera.');
+                    return;
+                }
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'environment' }, audio: false
+                    });
+                    video.srcObject = stream;
+                    modeCamera();              // opsi upload hilang; hanya kamera
+                } catch (err) {
+                    alert('Tidak dapat mengakses kamera: ' + err.message +
+                          '\n(Pastikan izin kamera diberikan dan halaman dibuka via localhost/HTTPS.)');
+                }
+            });
+
+            // "Batal" -> matikan kamera, kembali ke mode pilih sumber (switch ke upload)
+            closeCam.addEventListener('click', function () {
+                stopStream();
+                modeChooser();
+            });
+
+            snap.addEventListener('click', function () {
+                if (!video.videoWidth) { return; }
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                canvas.toBlob(function (blob) {
+                    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+                    const file = new File([blob], 'kamera_' + stamp + '.jpg',
+                                          { type: 'image/jpeg' });
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    input.files = dt.files;            // isi file input agar form siap submit
+                    stopStream();
+                    modePreview(URL.createObjectURL(blob), 'Foto dari kamera');
+                }, 'image/jpeg', 0.92);
+            });
+        }
+    </script>
+</body>
+</html>

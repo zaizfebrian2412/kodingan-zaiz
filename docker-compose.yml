@@ -1,0 +1,19 @@
+# Jalankan: SERVER_IP=<ip-vps> docker compose up -d --build
+# Akses:    https://<ip-vps>   (klik "Lanjutkan / Proceed" pada peringatan self-signed)
+services:
+  web:
+    build: .
+    image: cnn-zaiz-web
+    restart: unless-stopped
+    ports:
+      - "443:8443"          # host 443 (HTTPS standar) -> container 8443
+    environment:
+      - WASTE_DEMO=1
+      - SERVER_IP=${SERVER_IP:-127.0.0.1}
+    volumes:
+      - uploads:/app/app/static/uploads   # simpan gambar upload antar restart
+      - certs:/app/certs                  # pertahankan sertifikat antar restart
+
+volumes:
+  uploads:
+  certs:

@@ -1,0 +1,6 @@
+# Dependency MINIMAL untuk menjalankan aplikasi web (server/Docker).
+flask>=2.3,<4.0
+gunicorn>=21.0
+tensorflow>=2.13,<2.17
+numpy<2.0
+pillow>=9.5
